@@ -31,7 +31,7 @@ if not os.path.exists(MODEL_PATH):
         pass 
 
 # -----------------------------
-# Parameters
+# Parameters (ADJUSTED FOR SENSITIVITY)
 # -----------------------------
 detector = dlib.get_frontal_face_detector()
 
@@ -43,11 +43,11 @@ else:
 
 EYE_AR_THRESH_DROWSY = 0.26
 EYE_AR_THRESH_SLEEP = 0.21
-EYE_AR_CONSEC_FRAMES_DROWSY = 12
-EYE_AR_CONSEC_FRAMES_SLEEP = 25
+EYE_AR_CONSEC_FRAMES_DROWSY = 8   # <--- ADJUSTED (Increased Sensitivity)
+EYE_AR_CONSEC_FRAMES_SLEEP = 15  # <--- ADJUSTED (Increased Sensitivity)
 
 frame_counter = 0
-frame_skip = 2
+frame_skip = 1                   # <--- ADJUSTED (Disabled Frame Skipping)
 _frame_index = 0
 
 # -----------------------------
@@ -98,6 +98,7 @@ def detect_drowsiness(frame_bgr):
         cv2.polylines(frame_bgr, [left_eye],  True, (0, 255, 255), 1)
         cv2.polylines(frame_bgr, [right_eye], True, (0, 255, 255), 1)
 
+        # Check if eyes are below drowsy threshold
         if ear < EYE_AR_THRESH_DROWSY:
             frame_counter += 1
         else:
@@ -139,7 +140,8 @@ def process_stream(frame_rgb):
         return None, "Awaiting Input...", None
     
     _frame_index += 1
-    if _frame_index % frame_skip != 0:
+    # Check frame skip (now set to 1, so every frame is processed)
+    if frame_skip > 1 and _frame_index % frame_skip != 0:
         return frame_rgb, "Active 😃", None 
     
     frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
