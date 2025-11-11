@@ -7,6 +7,7 @@ import urllib.request
 from scipy.spatial import distance as dist
 import soundfile as sf
 import numpy as np
+import io
 
 # -----------------------------
 # Model Setup
@@ -51,9 +52,9 @@ def generate_alert_sound(duration=0.6, freq=440, volume=0.5, samplerate=44100):
     sf.write(buffer, data.astype(np.float32), samplerate, format='wav')
     buffer.seek(0)
     
+    # Gradio expects the sound data as a tuple (samplerate, audio_data)
+    # The 'audio_output' component in the interface handles reading the raw bytes.
     return buffer.read()
-
-import io # Add io import here
 
 def eye_aspect_ratio(eye):
     A = dist.euclidean(eye[1], eye[5])
@@ -146,7 +147,7 @@ with gr.Blocks(title="🚗 Driver Drowsiness Detection") as demo:
         webcam = gr.Image(
             sources=["webcam"],
             streaming=True,
-            label="Web Live Frame", # <--- CHANGE 1: New Frame Label
+            label="Web Live Frame",
             image_mode="RGB",
             height=320,
             width=480
@@ -155,10 +156,10 @@ with gr.Blocks(title="🚗 Driver Drowsiness Detection") as demo:
             gr.Markdown("## Live Monitoring")
             status_output = gr.Textbox(label="Driver State", value="Awaiting Input...")
             
-            # <--- CHANGE 3: Add Audio Component for Alert
-            audio_output = gr.Audio(label="Alert Sound", type="numpy", interactive=False, visible=False) 
+            # Add Audio Component for Alert
+            audio_output = gr.Audio(label="Alert Sound", type="bytes", interactive=False, visible=False) 
 
-    # <--- CHANGE 4: Update streaming function to handle multiple inputs/outputs
+    # Update streaming function to handle multiple inputs/outputs
     webcam.stream(
         fn=process_stream, 
         inputs=webcam, 
@@ -167,11 +168,11 @@ with gr.Blocks(title="🚗 Driver Drowsiness Detection") as demo:
 
 
 # -----------------------------
-# Launch (CRITICAL FIX FOR RENDER PORT ISSUE)
+# Launch (FIXED: Relies on Environment Variables for Render)
 # -----------------------------
 if __name__ == "__main__":
     # Local launch for development
     demo.launch(server_name="127.0.0.1", server_port=7860) 
 else:
-    # Deployment launch for Render (using mandatory host/port, bypassing Env Vars)
-    demo.launch(server_name="0.0.0.0", server_port=10000)
+    # Deployment launch for Render (Uses GRADIO_SERVER_NAME & GRADIO_SERVER_PORT)
+    demo.launch()
