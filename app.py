@@ -19,26 +19,27 @@ if not os.path.exists(MODEL_PATH):
     os.makedirs("Files", exist_ok=True)
     print("🔽 Downloading dlib facial landmark model (~100MB compressed)...")
     try:
+        # NOTE: This download happens during the 'Start Command' phase on Render
         urllib.request.urlretrieve(MODEL_URL, "Files/shape_predictor_68_face_landmarks.dat.bz2")
         import bz2
         with bz2.BZ2File("Files/shape_predictor_68_face_landmarks.dat.bz2") as fr, open(MODEL_PATH, "wb") as fw:
             fw.write(fr.read())
         print("✅ Model ready at:", MODEL_PATH)
     except Exception as e:
+        # If download fails, log error but proceed with graceful failure in app logic
         print(f"Error downloading or extracting model: {e}")
-        # The app might fail if the model isn't there, but we proceed for clarity
         pass 
 
 # -----------------------------
 # Parameters
 # -----------------------------
 detector = dlib.get_frontal_face_detector()
-# Only initialize if file exists to prevent hard crash if download failed
+
+# Only initialize if file exists, or use a dummy function if download failed
 if os.path.exists(MODEL_PATH):
     predictor = dlib.shape_predictor(MODEL_PATH)
 else:
-    # Use a dummy function if predictor isn't available
-    predictor = lambda *args: None
+    predictor = None 
 
 EYE_AR_THRESH_DROWSY = 0.26
 EYE_AR_THRESH_SLEEP = 0.21
@@ -69,7 +70,7 @@ def eye_aspect_ratio(eye):
 def detect_drowsiness(frame_bgr):
     global frame_counter
     
-    # Handle case where predictor might not be initialized due to failed download
+    # Gracefully fail if model is missing
     if predictor is None:
         return frame_bgr, "MODEL MISSING ❌", None 
 
@@ -134,12 +135,10 @@ def detect_drowsiness(frame_bgr):
 def process_stream(frame_rgb):
     global _frame_index
     
-    # Return default status if no frame is received
     if frame_rgb is None:
         return None, "Awaiting Input...", None
     
     _frame_index += 1
-    # Skip frames to reduce computational load
     if _frame_index % frame_skip != 0:
         return frame_rgb, "Active 😃", None 
     
@@ -163,7 +162,7 @@ with gr.Blocks(title="🚗 Driver Drowsiness Detection") as demo:
         webcam = gr.Image(
             sources=["webcam"],
             streaming=True,
-            label="Web Live Frame", # Your requested frame label
+            label="Web Live Frame",
             image_mode="RGB",
             height=320,
             width=480
@@ -172,10 +171,9 @@ with gr.Blocks(title="🚗 Driver Drowsiness Detection") as demo:
             gr.Markdown("## Live Monitoring")
             status_output = gr.Textbox(label="Driver State", value="Awaiting Input...")
             
-            # Audio component set to type="numpy" and invisible
+            # Audio component: type="numpy" is compatible with older Gradio versions
             audio_output = gr.Audio(label="Alert Sound", type="numpy", interactive=False, visible=False) 
 
-    # Link the stream function to the components
     webcam.stream(
         fn=process_stream, 
         inputs=webcam, 
@@ -183,8 +181,7 @@ with gr.Blocks(title="🚗 Driver Drowsiness Detection") as demo:
     )
 
 # -----------------------------
-# Launch (CRITICAL FIX FOR RENDER PORT ISSUE using Gunicorn)
+# Gunicorn Entry Point
 # -----------------------------
-# We must expose the Gradio application object (demo.app) for Gunicorn to run.
-# No need to call demo.launch() here.
+# Gunicorn needs this application object to run the web service.
 app = demo.app
