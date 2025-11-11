@@ -1,0 +1,18 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+.venv/
+
+# Model and large data files
+Files/*.bz2
+Files/*.dat
+
+# Logs and temp
+*.log
+*.tmp
+.DS_Store
+
+# System files
+Thumbs.db
