@@ -38,10 +38,10 @@ if os.path.exists(MODEL_PATH):
 else:
     predictor = None 
 
-EYE_AR_THRESH_DROWSY = 0.26
+EYE_AR_THRESH_DROWSY = 0.30
 EYE_AR_THRESH_SLEEP = 0.21
-EYE_AR_CONSEC_FRAMES_DROWSY = 4
-EYE_AR_CONSEC_FRAMES_SLEEP = 8
+EYE_AR_CONSEC_FRAMES_DROWSY = 3
+EYE_AR_CONSEC_FRAMES_SLEEP = 5
 
 frame_counter = 0
 frame_skip = 1                   
