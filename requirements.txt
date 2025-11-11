@@ -1,0 +1,9 @@
+gradio==4.32.0 
+opencv-python-headless==4.8.1.78 
+numpy==1.26.4 
+dlib-bin==19.24.6 
+imutils==0.5.4 
+pydub==0.25.1 
+requests==2.32.3 
+scipy==1.13.1 
+huggingface-hub==0.23.0
