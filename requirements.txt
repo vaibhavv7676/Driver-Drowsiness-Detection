@@ -9,3 +9,4 @@ scipy==1.13.1
 huggingface-hub==0.23.0
 soundfile==0.12.1
 gunicorn==22.0.0
+uvicorn==0.29.0
