@@ -5,8 +5,8 @@ import gradio as gr
 import os
 import urllib.request
 from scipy.spatial import distance as dist
-import platform
-import threading
+import soundfile as sf
+import numpy as np
 
 # -----------------------------
 # Model Setup
@@ -39,20 +39,22 @@ frame_skip = 2
 _frame_index = 0
 
 # -----------------------------
-# Optional Beep (for local use)
+# Helper Functions (Tone Generator for Web Alert)
 # -----------------------------
-def _beep_async():
-    try:
-        if platform.system() == "Windows":
-            import winsound; winsound.Beep(1000, 600)
-        else:
-            os.system('afplay /System/Library/Sounds/Ping.aiff >/dev/null 2>&1 &')
-    except Exception:
-        pass
+def generate_alert_sound(duration=0.6, freq=440, volume=0.5, samplerate=44100):
+    """Generates a simple sine wave tone for web playback."""
+    t = np.linspace(0, duration, int(samplerate * duration), False)
+    data = volume * np.sin(2. * np.pi * freq * t)
+    
+    # Save to a temporary in-memory buffer (required by Gradio Audio component)
+    buffer = io.BytesIO()
+    sf.write(buffer, data.astype(np.float32), samplerate, format='wav')
+    buffer.seek(0)
+    
+    return buffer.read()
 
-# -----------------------------
-# Helper Functions
-# -----------------------------
+import io # Add io import here
+
 def eye_aspect_ratio(eye):
     A = dist.euclidean(eye[1], eye[5])
     B = dist.euclidean(eye[2], eye[4])
@@ -68,7 +70,10 @@ def detect_drowsiness(frame_bgr):
     status = "Awake 😃"
     status_color = (0, 200, 0)
     alert_active = False
-
+    
+    # Default outputs if no face is detected
+    sound_output = None 
+    
     for face in faces:
         landmarks = predictor(gray, face)
         pts = np.array([[p.x, p.y] for p in landmarks.parts()], dtype=np.int32)
@@ -107,20 +112,24 @@ def detect_drowsiness(frame_bgr):
         cv2.rectangle(frame_bgr, (0,0), (frame_bgr.shape[1], frame_bgr.shape[0]), (0,0,255), 50)
         cv2.putText(frame_bgr, "⚠ ALERT: DRIVER DROWSY", (40,150),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255,255,255), 4)
-        threading.Thread(target=_beep_async, daemon=True).start()
-
-    return frame_bgr
+        
+        # Generate sound only when alert is active
+        sound_output = generate_alert_sound()
+        
+    return frame_bgr, status, sound_output
 
 def process_stream(frame_rgb):
     global _frame_index
     if frame_rgb is None:
-        return None
+        return None, "Awaiting Input...", None
     _frame_index += 1
     if _frame_index % frame_skip != 0:
-        return frame_rgb
+        return frame_rgb, "Active 😃", None 
+    
     frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
-    out_bgr = detect_drowsiness(frame_bgr)
-    return cv2.cvtColor(out_bgr, cv2.COLOR_BGR2RGB)
+    out_bgr, status, sound = detect_drowsiness(frame_bgr)
+    
+    return cv2.cvtColor(out_bgr, cv2.COLOR_BGR2RGB), status, sound
 
 # -----------------------------
 # Gradio Interface
@@ -132,22 +141,37 @@ with gr.Blocks(title="🚗 Driver Drowsiness Detection") as demo:
         Real-time **live monitoring** optimized for desktop and mobile webcams.
         """
     )
+    
+    with gr.Row():
+        webcam = gr.Image(
+            sources=["webcam"],
+            streaming=True,
+            label="Web Live Frame", # <--- CHANGE 1: New Frame Label
+            image_mode="RGB",
+            height=320,
+            width=480
+        )
+        with gr.Column(min_width=200):
+            gr.Markdown("## Live Monitoring")
+            status_output = gr.Textbox(label="Driver State", value="Awaiting Input...")
+            
+            # <--- CHANGE 3: Add Audio Component for Alert
+            audio_output = gr.Audio(label="Alert Sound", type="numpy", interactive=False, visible=False) 
 
-    webcam = gr.Image(
-        sources=["webcam"],
-        streaming=True,
-        label="Live Driver Monitor Feed",
-        image_mode="RGB",
-        height=320,
-        width=480
+    # <--- CHANGE 4: Update streaming function to handle multiple inputs/outputs
+    webcam.stream(
+        fn=process_stream, 
+        inputs=webcam, 
+        outputs=[webcam, status_output, audio_output]
     )
 
-    webcam.stream(fn=process_stream, inputs=webcam, outputs=webcam)
 
 # -----------------------------
-# Launch
+# Launch (CRITICAL FIX FOR RENDER PORT ISSUE)
 # -----------------------------
 if __name__ == "__main__":
-    demo.launch(server_name="127.0.0.1", server_port=7860)
+    # Local launch for development
+    demo.launch(server_name="127.0.0.1", server_port=7860) 
 else:
-    demo.launch()
+    # Deployment launch for Render (using mandatory host/port, bypassing Env Vars)
+    demo.launch(server_name="0.0.0.0", server_port=10000)
