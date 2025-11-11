@@ -10,3 +10,4 @@ huggingface-hub==0.23.0
 soundfile==0.12.1
 gunicorn==22.0.0
 uvicorn==0.29.0
+gradio-client==0.16.0
